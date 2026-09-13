@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { PlayerSaveData, CarDefinition } from '../types';
+import { PlayerSaveData, CarDefinition, MapId } from '../types';
 import { CARS_CATALOG, computeEffectiveStats } from '../data/cars';
-import { Play, Wrench, Trophy, HelpCircle, Volume2, VolumeX, Flame, Compass } from 'lucide-react';
+import { getMapById } from '../data/maps';
+import { Play, Wrench, Trophy, HelpCircle, Volume2, VolumeX, Flame, Compass, MapPin, ChevronRight } from 'lucide-react';
 import { sound } from '../utils/audio';
+import { MapSelectorModal } from './MapSelectorModal';
 
 interface MainMenuProps {
   playerData: PlayerSaveData;
   onStartRace: () => void;
   onOpenGarage: () => void;
+  onSelectMap: (mapId: MapId) => void;
   isMuted: boolean;
   onToggleMute: () => void;
 }
@@ -16,14 +19,17 @@ export const MainMenu: React.FC<MainMenuProps> = ({
   playerData,
   onStartRace,
   onOpenGarage,
+  onSelectMap,
   isMuted,
   onToggleMute,
 }) => {
   const [showHelp, setShowHelp] = useState(false);
+  const [showMapSelector, setShowMapSelector] = useState(false);
 
   const currentCar = CARS_CATALOG.find((c) => c.id === playerData.currentCarId) || CARS_CATALOG[0];
   const upgrades = playerData.carUpgrades[currentCar.id] || { speedLevel: 1, accelLevel: 1, handlingLevel: 1, brakingLevel: 1 };
   const effectiveStats = computeEffectiveStats(currentCar, upgrades);
+  const currentMap = getMapById(playerData.currentMapId || 'metropolis');
 
   return (
     <div id="main-menu" className="absolute inset-0 z-20 flex flex-col justify-between p-4 sm:p-8 bg-gradient-to-b from-zinc-950/80 via-zinc-900/60 to-zinc-950/90 backdrop-blur-sm text-white select-none">
@@ -66,21 +72,50 @@ export const MainMenu: React.FC<MainMenuProps> = ({
 
       {/* Middle Center: High-impact Action Hero */}
       <div className="flex flex-col items-center justify-center max-w-xl mx-auto text-center my-auto w-full">
-        {/* Selected Car Highlight */}
-        <div className="mb-6 p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 backdrop-blur-md shadow-2xl w-full max-w-md">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Active Machine</span>
-            <span className="text-xs font-bold px-2 py-0.5 rounded bg-zinc-800 text-amber-400 border border-zinc-700">
-              {currentCar.category.toUpperCase()} CLASS
-            </span>
-          </div>
-          <div className="flex items-baseline justify-between">
-            <h3 className="text-2xl font-black text-white">{currentCar.name}</h3>
-            <div className="text-right">
-              <span className="text-xs text-zinc-400">Top Speed </span>
-              <span className="text-lg font-black text-emerald-400">{effectiveStats.topSpeed} <span className="text-xs font-semibold">km/h</span></span>
+        {/* Selected Car & Track Highlight */}
+        <div className="mb-6 w-full max-w-md space-y-3">
+          <div className="p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 backdrop-blur-md shadow-2xl">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Active Machine</span>
+              <span className="text-xs font-bold px-2 py-0.5 rounded bg-zinc-800 text-amber-400 border border-zinc-700">
+                {currentCar.category.toUpperCase()} CLASS
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-2xl font-black text-white">{currentCar.name}</h3>
+              <div className="text-right">
+                <span className="text-xs text-zinc-400">Top Speed </span>
+                <span className="text-lg font-black text-emerald-400">{effectiveStats.topSpeed} <span className="text-xs font-semibold">km/h</span></span>
+              </div>
             </div>
           </div>
+
+          {/* Map Track Selector Card */}
+          <button
+            id="menu-select-map-btn"
+            onClick={() => {
+              sound.playClick();
+              setShowMapSelector(true);
+            }}
+            className="w-full p-3.5 rounded-2xl bg-zinc-900/80 hover:bg-zinc-800/90 border border-zinc-800 hover:border-zinc-700 backdrop-blur-md transition flex items-center justify-between shadow-xl cursor-pointer text-left group"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-zinc-950 flex items-center justify-center border border-zinc-800 shadow">
+                <MapPin className="w-5 h-5 text-red-400 group-hover:scale-110 transition-transform" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-400">Highway Track</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-400">4 Routes</span>
+                </div>
+                <div className="text-base font-black text-white">{currentMap.name}</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 text-xs font-bold text-zinc-400 group-hover:text-amber-400 transition">
+              <span>Change</span>
+              <ChevronRight className="w-4 h-4" />
+            </div>
+          </button>
         </div>
 
         {/* Primary CTA: PLAY NOW */}
@@ -190,6 +225,17 @@ export const MainMenu: React.FC<MainMenuProps> = ({
             </button>
           </div>
         </div>
+      )}
+
+      {/* Highway Map Selector Modal */}
+      {showMapSelector && (
+        <MapSelectorModal
+          currentMapId={playerData.currentMapId || 'metropolis'}
+          onSelectMap={(mapId) => {
+            onSelectMap(mapId);
+          }}
+          onClose={() => setShowMapSelector(false)}
+        />
       )}
     </div>
   );

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { PlayerSaveData, Upgrades } from '../types';
+import { PlayerSaveData, Upgrades, MapId } from '../types';
 import { CARS_CATALOG, PAINT_COLORS, getUpgradeCost, computeEffectiveStats } from '../data/cars';
-import { ArrowLeft, Play, Lock, Check, Sparkles, ChevronLeft, ChevronRight, Gauge, Zap, Crosshair, Disc } from 'lucide-react';
+import { getMapById } from '../data/maps';
+import { ArrowLeft, Play, Lock, Check, Sparkles, ChevronLeft, ChevronRight, Gauge, Zap, Crosshair, Disc, MapPin } from 'lucide-react';
 import { sound } from '../utils/audio';
+import { MapSelectorModal } from './MapSelectorModal';
 
 interface GarageViewProps {
   playerData: PlayerSaveData;
@@ -10,6 +12,7 @@ interface GarageViewProps {
   onBackToMenu: () => void;
   onStartRace: () => void;
   onSelectCarForTurntable: (carId: string, colorHex: string, upgrades: Upgrades) => void;
+  onSelectMap: (mapId: MapId) => void;
 }
 
 export const GarageView: React.FC<GarageViewProps> = ({
@@ -18,15 +21,18 @@ export const GarageView: React.FC<GarageViewProps> = ({
   onBackToMenu,
   onStartRace,
   onSelectCarForTurntable,
+  onSelectMap,
 }) => {
   const [selectedCarIndex, setSelectedCarIndex] = useState(() => {
     const idx = CARS_CATALOG.findIndex((c) => c.id === playerData.currentCarId);
     return idx >= 0 ? idx : 0;
   });
+  const [showMapSelector, setShowMapSelector] = useState(false);
 
   const car = CARS_CATALOG[selectedCarIndex];
   const isOwned = playerData.ownedCars.includes(car.id);
   const isEquipped = playerData.currentCarId === car.id;
+  const currentMap = getMapById(playerData.currentMapId || 'metropolis');
 
   const upgrades = playerData.carUpgrades[car.id] || {
     speedLevel: 1,
@@ -142,11 +148,26 @@ export const GarageView: React.FC<GarageViewProps> = ({
           <span className="font-bold text-sm">Back to Menu</span>
         </button>
 
-        <div className="flex items-center gap-2 bg-zinc-900/90 border border-amber-500/40 px-4 py-2 rounded-xl shadow-lg">
-          <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-amber-600 to-amber-300 flex items-center justify-center text-zinc-950 text-xs font-black shadow">
-            $
+        <div className="flex items-center gap-2.5">
+          <button
+            id="garage-track-btn"
+            onClick={() => {
+              sound.playClick();
+              setShowMapSelector(true);
+            }}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-200 hover:text-white transition shadow-lg text-xs font-bold cursor-pointer"
+          >
+            <MapPin className="w-4 h-4 text-red-400" />
+            <span className="hidden sm:inline text-zinc-400">Track:</span>
+            <span className="text-amber-400 font-extrabold">{currentMap.name}</span>
+          </button>
+
+          <div className="flex items-center gap-2 bg-zinc-900/90 border border-amber-500/40 px-4 py-2 rounded-xl shadow-lg">
+            <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-amber-600 to-amber-300 flex items-center justify-center text-zinc-950 text-xs font-black shadow">
+              $
+            </div>
+            <span className="font-black text-amber-400 tabular-nums text-lg">{playerData.coins.toLocaleString()}</span>
           </div>
-          <span className="font-black text-amber-400 tabular-nums text-lg">{playerData.coins.toLocaleString()}</span>
         </div>
       </div>
 
@@ -324,6 +345,19 @@ export const GarageView: React.FC<GarageViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Map Track Selector Modal */}
+      {showMapSelector && (
+        <div className="pointer-events-auto">
+          <MapSelectorModal
+            currentMapId={playerData.currentMapId || 'metropolis'}
+            onSelectMap={(mapId) => {
+              onSelectMap(mapId);
+            }}
+            onClose={() => setShowMapSelector(false)}
+          />
+        </div>
+      )}
     </div>
   );
 };

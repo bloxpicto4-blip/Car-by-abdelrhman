@@ -8,12 +8,12 @@ export const CARS_CATALOG: CarDefinition[] = [
     price: 0, // Free starter
     unlocked: true,
     baseStats: {
-      topSpeed: 190,
-      acceleration: 6.0,
-      handling: 6.5,
-      braking: 6.5,
+      topSpeed: 195,
+      acceleration: 6.2,
+      handling: 6.8,
+      braking: 6.8,
     },
-    defaultColor: '#dc2626', // Flame Red
+    defaultColor: '#2563eb', // Apex Royal Blue
     description: 'A well-balanced Japanese sports coupe engineered for agile lane-weaving and responsive highway handling.',
   },
   {
@@ -23,62 +23,199 @@ export const CARS_CATALOG: CarDefinition[] = [
     price: 350,
     unlocked: false,
     baseStats: {
-      topSpeed: 215,
-      acceleration: 7.8,
-      handling: 5.5,
-      braking: 6.0,
+      topSpeed: 218,
+      acceleration: 7.9,
+      handling: 5.6,
+      braking: 6.2,
     },
-    defaultColor: '#f59e0b', // Amber Gold
+    defaultColor: '#ea580c', // Sunset Orange
     description: 'Raw American muscle with thunderous low-end torque, aggressive dual racing stripes, and imposing highway presence.',
   },
   {
     id: 'phantom-rs',
     name: 'Phantom RS',
     category: 'super',
-    price: 900,
+    price: 850,
     unlocked: false,
     baseStats: {
-      topSpeed: 245,
-      acceleration: 8.5,
-      handling: 8.0,
-      braking: 8.0,
+      topSpeed: 248,
+      acceleration: 8.6,
+      handling: 8.2,
+      braking: 8.3,
     },
-    defaultColor: '#2563eb', // Apex Royal Blue
-    description: 'European mid-engine supercar boasting track-honed aerodynamics, carbon fiber wing, and blisteringly fast acceleration.',
+    defaultColor: '#18181b', // Obsidian Black
+    description: 'Precision German track-honed supercar boasting active rear wing, carbon fiber aerodynamics, and razor-sharp highway agility.',
+  },
+  {
+    id: 'scuderia-f8',
+    name: 'Scuderia Tributo F8',
+    category: 'super',
+    price: 1450,
+    unlocked: false,
+    baseStats: {
+      topSpeed: 265,
+      acceleration: 9.2,
+      handling: 9.3,
+      braking: 9.1,
+    },
+    defaultColor: '#dc2626', // Rosso Corsa Red
+    description: 'Italian thoroughbred with legendary Maranello racing grace. Twin-turbo flat-plane V8, sculpted S-Duct nose, and sublime aerodynamic poise.',
+  },
+  {
+    id: 'monza-sp',
+    name: 'Scuderia Monza SP',
+    category: 'super',
+    price: 1950,
+    unlocked: false,
+    baseStats: {
+      topSpeed: 278,
+      acceleration: 9.5,
+      handling: 9.5,
+      braking: 9.3,
+    },
+    defaultColor: '#dc2626', // Rosso Scuderia
+    description: 'Bespoke open-cockpit Italian barchetta. Pure speedster minimalism, dual aerodynamic headrest cowls, screaming atmospheric V12, and racing heritage.',
   },
   {
     id: 'nemesis-hyper',
     name: 'Nemesis Hyper',
     category: 'hyper',
-    price: 2200,
+    price: 2400,
     unlocked: false,
     baseStats: {
-      topSpeed: 285,
-      acceleration: 9.8,
-      handling: 9.2,
-      braking: 9.5,
+      topSpeed: 288,
+      acceleration: 9.7,
+      handling: 9.1,
+      braking: 9.4,
     },
     defaultColor: '#10b981', // Emerald Venom
-    description: 'The pinnacle of prototype hypercar engineering. Ground-effect aerodynamics, active aero fins, and unrivaled top speed.',
+    description: 'Prototype endurance hypercar with central shark dorsal fin, extreme ground-effect tunnels, and blistering high-speed stamina.',
+  },
+  {
+    id: 'toro-sv',
+    name: 'Toro SV Centenario',
+    category: 'hyper',
+    price: 3400,
+    unlocked: false,
+    baseStats: {
+      topSpeed: 305,
+      acceleration: 9.9,
+      handling: 9.6,
+      braking: 9.7,
+    },
+    defaultColor: '#eab308', // Giallo Auge Pearl Yellow
+    description: "Savage Italian raging bull with extreme faceted stealth-fighter geometry, screaming naturally aspirated V12, and massive swan-neck carbon wing.",
+  },
+  {
+    id: 'veneno-sv',
+    name: 'Diablo Veneno LP-750',
+    category: 'hyper',
+    price: 4600,
+    unlocked: false,
+    baseStats: {
+      topSpeed: 320,
+      acceleration: 10.0,
+      handling: 9.8,
+      braking: 9.9,
+    },
+    defaultColor: '#475569', // Grigio Metallizzato
+    description: 'Radical Sant’Agata track prototype. Triple roof scoop, towering central dorsal stabilizer fin, red-trimmed carbon aero, and jet-fighter telemetry.',
+  },
+  {
+    id: 'van-apex-cargo',
+    name: 'Apex Cargo Turbo Van',
+    category: 'van',
+    price: 180,
+    unlocked: false,
+    baseStats: {
+      topSpeed: 188,
+      acceleration: 6.8,
+      handling: 6.5,
+      braking: 7.2,
+    },
+    defaultColor: '#f59e0b', // Industrial Amber
+    description: 'High-roof Euro express delivery turbo van. Reinforced box chassis, chrome roof cargo ladder rack, heavy-duty suspension, and punchy turbodiesel torque.',
+  },
+  {
+    id: 'van-dajiban-drift',
+    name: 'Dajiban Custom Drift Van',
+    category: 'van',
+    price: 650,
+    unlocked: false,
+    baseStats: {
+      topSpeed: 216,
+      acceleration: 8.0,
+      handling: 8.2,
+      braking: 7.6,
+    },
+    defaultColor: '#06b6d4', // Neon Turquoise
+    description: 'Slammed Japanese custom racing van. Bolted widebody fenders, deep-dish bronze racing rims, chin splitter, side-exit exhaust flame pipes, and raw drift attitude.',
+  },
+  {
+    id: 'van-cyber-hauler',
+    name: 'Cyber Hauler Titan',
+    category: 'van',
+    price: 1350,
+    unlocked: false,
+    baseStats: {
+      topSpeed: 238,
+      acceleration: 8.9,
+      handling: 8.5,
+      braking: 8.7,
+    },
+    defaultColor: '#6366f1', // Electric Indigo
+    description: 'Next-generation aerodynamic electric van. Full-width matrix LED lightbars, roof aero fin spoiler, instant twin-motor torque, and sleek hyper-van aerodynamics.',
+  },
+  {
+    id: 'tsunami-gtr',
+    name: 'Tsunami GT-R V-Spec',
+    category: 'sports',
+    price: 1150,
+    unlocked: false,
+    baseStats: {
+      topSpeed: 258,
+      acceleration: 9.0,
+      handling: 8.9,
+      braking: 8.6,
+    },
+    defaultColor: '#2563eb', // Bayside Royal Blue
+    description: 'Iconic twin-turbo all-wheel-drive highway legend. Quad circular afterburner taillights, twin hood heat extractors, high GT wing, and legendary highway pedigree.',
+  },
+  {
+    id: 'valkyrie-lm',
+    name: 'Valkyrie Hyper-LM',
+    category: 'hyper',
+    price: 5200,
+    unlocked: false,
+    baseStats: {
+      topSpeed: 330,
+      acceleration: 10.0,
+      handling: 9.9,
+      braking: 10.0,
+    },
+    defaultColor: '#10b981', // Emerald Venom
+    description: 'Ultimate 1000hp endurance racing prototype. Sculpted teardrop canopy, roof periscope ram-air intake, colossal swan-neck wing, and ground-effect venturi tunnels.',
   },
 ];
 
 export const PAINT_COLORS = [
-  { name: 'Crimson Red', hex: '#dc2626' },
-  { name: 'Apex Blue', hex: '#2563eb' },
-  { name: 'Sunset Amber', hex: '#f59e0b' },
-  { name: 'Emerald Venom', hex: '#10b981' },
-  { name: 'Stealth Black', hex: '#18181b' },
-  { name: 'Pearlescent White', hex: '#f4f4f5' },
-  { name: 'Cyber Violet', hex: '#8b5cf6' },
-  { name: 'Acid Neon', hex: '#84cc16' },
+  { name: 'Rosso Corsa Red', hex: '#dc2626' },
+  { name: 'Giallo Pearl Yellow', hex: '#eab308' },
+  { name: 'Apex Royal Blue', hex: '#2563eb' },
+  { name: 'Verde Mantis Green', hex: '#16a34a' },
+  { name: 'Obsidian Stealth Black', hex: '#18181b' },
+  { name: 'Bianco Pearl White', hex: '#f8fafc' },
+  { name: 'Arancio Sunset Orange', hex: '#ea580c' },
+  { name: 'Viola Cyber Purple', hex: '#9333ea' },
+  { name: 'Nardo Gunmetal Gray', hex: '#475569' },
+  { name: 'Turquoise Neon Glow', hex: '#06b6d4' },
 ];
 
 export const UPGRADE_BASE_COST = {
-  speed: 100,
-  accel: 90,
-  handling: 85,
-  braking: 75,
+  speed: 110,
+  accel: 95,
+  handling: 90,
+  braking: 80,
 };
 
 export function getUpgradeCost(type: keyof Upgrades, currentLevel: number): number {

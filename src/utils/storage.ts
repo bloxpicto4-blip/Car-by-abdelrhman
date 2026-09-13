@@ -1,7 +1,7 @@
 import { PlayerSaveData, Upgrades } from '../types';
 import { CARS_CATALOG } from '../data/cars';
 
-const STORAGE_KEY = 'traffic_racer_3d_save_v1';
+const STORAGE_KEY = 'traffic_racer_3d_save_v2';
 
 const DEFAULT_UPGRADES: Upgrades = {
   speedLevel: 1,
@@ -11,23 +11,28 @@ const DEFAULT_UPGRADES: Upgrades = {
 };
 
 export const INITIAL_PLAYER_DATA: PlayerSaveData = {
-  coins: 150, // Starting gift to encourage first upgrade or save towards muscle car
+  coins: 250, // Starting gift to encourage first upgrades or save toward garage cars
   highScore: 0,
   bestDistanceMeters: 0,
   totalNearMisses: 0,
   ownedCars: ['vortex-gt'],
   currentCarId: 'vortex-gt',
+  currentMapId: 'metropolis',
   carUpgrades: {
     'vortex-gt': { ...DEFAULT_UPGRADES },
     'thunder-v8': { ...DEFAULT_UPGRADES },
     'phantom-rs': { ...DEFAULT_UPGRADES },
+    'scuderia-f8': { ...DEFAULT_UPGRADES },
     'nemesis-hyper': { ...DEFAULT_UPGRADES },
+    'toro-sv': { ...DEFAULT_UPGRADES },
   },
   carColors: {
-    'vortex-gt': '#dc2626',
-    'thunder-v8': '#f59e0b',
-    'phantom-rs': '#2563eb',
+    'vortex-gt': '#2563eb',
+    'thunder-v8': '#ea580c',
+    'phantom-rs': '#18181b',
+    'scuderia-f8': '#dc2626',
     'nemesis-hyper': '#10b981',
+    'toro-sv': '#eab308',
   },
   settings: {
     audioEnabled: true,
@@ -38,12 +43,14 @@ export const INITIAL_PLAYER_DATA: PlayerSaveData = {
 
 export function loadGameData(): PlayerSaveData {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('traffic_racer_3d_save_v1');
     if (!raw) return { ...INITIAL_PLAYER_DATA };
     const parsed = JSON.parse(raw);
     return {
       ...INITIAL_PLAYER_DATA,
       ...parsed,
+      currentMapId: parsed.currentMapId || 'metropolis',
+      ownedCars: Array.isArray(parsed.ownedCars) && parsed.ownedCars.length > 0 ? parsed.ownedCars : ['vortex-gt'],
       carUpgrades: {
         ...INITIAL_PLAYER_DATA.carUpgrades,
         ...(parsed.carUpgrades || {}),

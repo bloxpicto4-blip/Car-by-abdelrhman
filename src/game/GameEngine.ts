@@ -1,9 +1,12 @@
 import * as THREE from 'three';
-import { CarDefinition, InputState, NearMissEvent, TelemetryData, Upgrades } from '../types';
+import { CarDefinition, InputState, MapId, NearMissEvent, TelemetryData, Upgrades, WeatherCondition } from '../types';
 import { CARS_CATALOG, computeEffectiveStats } from '../data/cars';
+import { getMapById, MAPS_CATALOG } from '../data/maps';
 import { buildPlayerCar, CarMeshBundle, setBrakeLights } from './carBuilder';
 import { HighwayEnvironment, HIGHWAY_WIDTH, LANE_X } from './environment';
 import { TrafficManager } from './trafficManager';
+import { TrafficLightManager } from './trafficLightManager';
+import { WeatherManager } from './weatherManager';
 import { sound } from '../utils/audio';
 
 export interface GameEngineCallbacks {
@@ -27,9 +30,15 @@ export class GameEngine {
   private animFrameId: number | null = null;
   private lastTime: number = 0;
 
-  // Environment & Systems
+  // Environment, Systems & Weather
+  private activeMapId: MapId = 'metropolis';
   private environment!: HighwayEnvironment;
   private trafficManager!: TrafficManager;
+  private trafficLightManager!: TrafficLightManager;
+  private weatherManager!: WeatherManager;
+  private ambientLight!: THREE.AmbientLight;
+  private dirLight!: THREE.DirectionalLight;
+  private skyLight!: THREE.HemisphereLight;
   private playerCarBundle: CarMeshBundle | null = null;
   private callbacks: GameEngineCallbacks;
 
@@ -82,6 +91,7 @@ export class GameEngine {
   private currentCamPos = new THREE.Vector3(0, 3.4, -6.5);
   private currentLookTarget = new THREE.Vector3(0, 1.2, 8.0);
   private camShakeIntensity: number = 0;
+  private shakeTime: number = 0;
 
   private isRunning: boolean = false;
   private isPaused: boolean = false;
@@ -130,34 +140,48 @@ export class GameEngine {
     this.container.appendChild(this.renderer.domElement);
 
     // Initialize systems
-    this.environment = new HighwayEnvironment(this.scene);
+    const initialMap = getMapById(this.activeMapId);
+    this.scene.background = new THREE.Color(initialMap.skyColor);
+    this.scene.fog = new THREE.FogExp2(initialMap.fogColor, initialMap.fogDensity);
+    this.environment = new HighwayEnvironment(this.scene, initialMap);
     this.trafficManager = new TrafficManager(this.scene);
+    this.trafficLightManager = new TrafficLightManager(this.scene);
   }
 
   private initLighting() {
-    // Ambient light with midnight blue tint
-    const ambientLight = new THREE.AmbientLight(0x2d3748, 1.3);
-    this.scene.add(ambientLight);
+    const initialMap = getMapById(this.activeMapId);
+    // Ambient light with map tint
+    this.ambientLight = new THREE.AmbientLight(initialMap.ambientColor, initialMap.ambientIntensity);
+    this.scene.add(this.ambientLight);
 
-    // Moonlight / Sunset Directional light
-    const dirLight = new THREE.DirectionalLight(0xe2e8f0, 1.8);
-    dirLight.position.set(25, 45, -20);
-    dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 1024;
-    dirLight.shadow.mapSize.height = 1024;
-    dirLight.shadow.camera.near = 10;
-    dirLight.shadow.camera.far = 130;
+    // Directional light
+    this.dirLight = new THREE.DirectionalLight(initialMap.dirLightColor, initialMap.dirLightIntensity);
+    this.dirLight.position.set(25, 45, -20);
+    this.dirLight.castShadow = true;
+    this.dirLight.shadow.mapSize.width = 1024;
+    this.dirLight.shadow.mapSize.height = 1024;
+    this.dirLight.shadow.camera.near = 10;
+    this.dirLight.shadow.camera.far = 130;
     const d = 35;
-    dirLight.shadow.camera.left = -d;
-    dirLight.shadow.camera.right = d;
-    dirLight.shadow.camera.top = d;
-    dirLight.shadow.camera.bottom = -d;
-    dirLight.shadow.bias = -0.0005;
-    this.scene.add(dirLight);
+    this.dirLight.shadow.camera.left = -d;
+    this.dirLight.shadow.camera.right = d;
+    this.dirLight.shadow.camera.top = d;
+    this.dirLight.shadow.camera.bottom = -d;
+    this.dirLight.shadow.bias = -0.0005;
+    this.scene.add(this.dirLight);
 
     // Subtle horizon sun flare / city backlight
-    const skyLight = new THREE.HemisphereLight(0x38bdf8, 0x1e293b, 0.9);
-    this.scene.add(skyLight);
+    this.skyLight = new THREE.HemisphereLight(0x38bdf8, 0x1e293b, 0.95);
+    this.scene.add(this.skyLight);
+
+    // Dynamic Weather System (Clear, Rainy, Foggy)
+    this.weatherManager = new WeatherManager(
+      this.scene,
+      this.environment,
+      this.ambientLight,
+      this.dirLight,
+      this.skyLight
+    );
   }
 
   private initFX() {
@@ -311,6 +335,8 @@ export class GameEngine {
 
     this.environment.reset(0);
     this.trafficManager.initTraffic(0);
+    this.trafficLightManager.reset(0);
+    this.weatherManager.reset('clear');
 
     if (this.playerCarBundle) {
       this.playerCarBundle.group.position.set(0, 0, 0);
@@ -320,6 +346,8 @@ export class GameEngine {
 
     this.currentCamPos.set(0, 3.4, -6.5);
     this.currentLookTarget.set(0, 1.2, 8.0);
+    this.camShakeIntensity = 0;
+    this.shakeTime = 0;
 
     sound.startEngine();
 
@@ -342,6 +370,7 @@ export class GameEngine {
     this.isRunning = false;
     sound.stopEngine();
     sound.stopHorn();
+    sound.stopRain();
   }
 
   private loop(now: number) {
@@ -363,9 +392,40 @@ export class GameEngine {
       this.updateCollisionsAndPrizes(delta);
     }
 
-    // Update Highway and Traffic
+    // Update Highway, Traffic Lights, Traffic and Weather
     this.environment.update(this.playerZ, delta);
-    this.trafficManager.update(this.playerZ, this.playerX, this.playerSpeedMs, delta);
+    const signalUpdate = this.trafficLightManager.update(this.playerZ, delta);
+    this.trafficManager.update(
+      this.playerZ,
+      this.playerX,
+      this.playerSpeedMs,
+      delta,
+      this.trafficLightManager.gantries
+    );
+
+    if (signalUpdate.stateChanged && signalUpdate.changedGantry) {
+      const dist = signalUpdate.changedGantry.z - this.playerZ;
+      if (dist > 0 && dist < 220) {
+        sound.playTrafficSignalAlert(signalUpdate.changedGantry.state === 'red');
+      }
+    }
+
+    if (signalUpdate.clearedRedLight) {
+      sound.playIntersectionCleared();
+      const bonus = 600;
+      this.currentScore += bonus;
+      this.coinsEarnedThisRun += 30;
+      this.nitroCharge = Math.min(100, this.nitroCharge + 30);
+      this.callbacks.onNearMiss({
+        id: Date.now(),
+        text: `RED LIGHT RUNNER! +${bonus} PTS`,
+        score: bonus,
+        coins: 30,
+        timestamp: Date.now(),
+      });
+    }
+
+    this.weatherManager.update(this.playerX, this.playerZ, this.playerSpeedMs, delta);
     this.updateSparks(delta);
     this.updateCamera(delta);
     this.updateAudioAndTelemetry();
@@ -391,6 +451,7 @@ export class GameEngine {
       if (!this.isNitroActive) {
         sound.playNitro();
         this.isNitroActive = true;
+        this.camShakeIntensity = Math.max(this.camShakeIntensity, 0.42); // punchy nitro kick shock
       }
       this.nitroCharge = Math.max(0, this.nitroCharge - delta * 24); // drains over ~4s
     } else {
@@ -450,13 +511,13 @@ export class GameEngine {
     if (this.playerX < -maxRoadX) {
       this.playerX = -maxRoadX;
       this.playerSpeedMs *= 0.92; // scrape penalty
-      this.camShakeIntensity = 0.4;
+      this.camShakeIntensity = Math.max(this.camShakeIntensity, 0.65);
       sound.playScreech();
       this.emitSparks(new THREE.Vector3(this.playerX, 0.4, this.playerZ), 6, new THREE.Vector3(1, 1, -1));
     } else if (this.playerX > maxRoadX) {
       this.playerX = maxRoadX;
       this.playerSpeedMs *= 0.92;
-      this.camShakeIntensity = 0.4;
+      this.camShakeIntensity = Math.max(this.camShakeIntensity, 0.65);
       sound.playScreech();
       this.emitSparks(new THREE.Vector3(this.playerX, 0.4, this.playerZ), 6, new THREE.Vector3(-1, 1, -1));
     }
@@ -539,12 +600,20 @@ export class GameEngine {
       this.nearMissesCount++;
       this.currentScore += nearMissResult.bonusScore;
       this.coinsEarnedThisRun += nearMissResult.bonusCoins;
-      this.nitroCharge = Math.min(100, this.nitroCharge + 15); // near misses grant nitro!
+      this.nitroCharge = Math.min(100, this.nitroCharge + (nearMissResult.isStoppedWeave ? 24 : 15));
       sound.playNearMiss();
+
+      // High-speed sonic wake turbulence twitch
+      if (speedKmh > 105) {
+        this.camShakeIntensity = Math.max(
+          this.camShakeIntensity,
+          nearMissResult.isStoppedWeave ? 0.44 : 0.28
+        );
+      }
 
       this.callbacks.onNearMiss({
         id: Date.now(),
-        text: `NEAR MISS! +${nearMissResult.bonusScore} PTS`,
+        text: nearMissResult.text,
         score: nearMissResult.bonusScore,
         coins: nearMissResult.bonusCoins,
         timestamp: Date.now(),
@@ -588,7 +657,7 @@ export class GameEngine {
         // Minor side bump / scrape
         this.playerSpeedMs *= 0.78;
         this.playerX += (this.playerX > traffic.x ? 1 : -1) * 0.6;
-        this.camShakeIntensity = 0.6;
+        this.camShakeIntensity = Math.max(this.camShakeIntensity, 0.95);
         sound.playScreech();
         this.emitSparks(
           new THREE.Vector3(this.playerX, 0.5, this.playerZ),
@@ -605,7 +674,7 @@ export class GameEngine {
   private triggerCrash(traffic: { x: number; z: number; speedMs: number }) {
     this.isCrashing = true;
     this.crashTimer = 0;
-    this.camShakeIntensity = 1.2;
+    this.camShakeIntensity = 2.0;
 
     sound.playCrash();
     sound.stopEngine();
@@ -640,6 +709,7 @@ export class GameEngine {
     if (this.playerY <= 0) {
       this.playerY = 0;
       this.crashLinearVel.y = -this.crashLinearVel.y * 0.35; // bounce
+      this.camShakeIntensity = Math.max(this.camShakeIntensity, 1.25);
       this.emitSparks(new THREE.Vector3(this.playerX, 0.2, this.playerZ), 8);
     }
 
@@ -662,10 +732,13 @@ export class GameEngine {
   }
 
   private updateCamera(delta: number) {
+    const speedKmh = this.playerSpeedMs * 3.6;
     const speedRatio = Math.min(1.0, this.playerSpeedMs / 70);
 
     // Dynamic FOV based on speed (widens as you go fast for hyperspeed feel)
-    const targetFov = 60 + speedRatio * 13;
+    // Extra FOV stretch during nitro
+    const nitroFovBonus = this.isNitroActive ? 5.5 : 0;
+    const targetFov = 60 + speedRatio * 13 + nitroFovBonus;
     this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, delta * 3.5);
     this.camera.updateProjectionMatrix();
 
@@ -678,27 +751,12 @@ export class GameEngine {
     const targetCamY = this.playerY + camHeight;
     const targetCamZ = this.playerZ - camDist;
 
-    // Camera shake calculation (from speed + crash)
-    let shakeX = 0;
-    let shakeY = 0;
-    if (this.camShakeIntensity > 0.01) {
-      shakeX = (Math.random() - 0.5) * this.camShakeIntensity;
-      shakeY = (Math.random() - 0.5) * this.camShakeIntensity;
-      this.camShakeIntensity = THREE.MathUtils.lerp(this.camShakeIntensity, 0, delta * 4.0);
-    } else if (speedRatio > 0.8) {
-      // Subtle speed vibration at 200+ km/h
-      const vib = (speedRatio - 0.8) * 0.08;
-      shakeX = (Math.random() - 0.5) * vib;
-      shakeY = (Math.random() - 0.5) * vib;
-    }
-
-    this.currentCamPos.x = THREE.MathUtils.lerp(this.currentCamPos.x, targetCamX + shakeX, delta * 9.0);
-    this.currentCamPos.y = THREE.MathUtils.lerp(this.currentCamPos.y, targetCamY + shakeY, delta * 9.0);
+    // Smooth baseline camera position tracking
+    this.currentCamPos.x = THREE.MathUtils.lerp(this.currentCamPos.x, targetCamX, delta * 9.0);
+    this.currentCamPos.y = THREE.MathUtils.lerp(this.currentCamPos.y, targetCamY, delta * 9.0);
     this.currentCamPos.z = THREE.MathUtils.lerp(this.currentCamPos.z, targetCamZ, delta * 12.0);
 
-    this.camera.position.copy(this.currentCamPos);
-
-    // Look Target
+    // Smooth baseline look target tracking
     const lookAheadDist = 18 + speedRatio * 16;
     const targetLookX = this.playerX * 0.85;
     const targetLookY = this.playerY + 1.2;
@@ -708,7 +766,85 @@ export class GameEngine {
     this.currentLookTarget.y = THREE.MathUtils.lerp(this.currentLookTarget.y, targetLookY, delta * 10.0);
     this.currentLookTarget.z = THREE.MathUtils.lerp(this.currentLookTarget.z, targetLookZ, delta * 14.0);
 
-    this.camera.lookAt(this.currentLookTarget);
+    // --- Dynamic High-Speed Shake & Collision Trauma System ---
+    this.shakeTime += delta * (22 + speedRatio * 40);
+
+    // 1. Velocity-induced camera shake
+    // Starts subtly at ~70 km/h and scales non-linearly to provide intense velocity feedback
+    let speedShakeX = 0;
+    let speedShakeY = 0;
+    let speedShakeZ = 0;
+    let speedRollShake = 0;
+
+    if (speedKmh > 70) {
+      const speedNorm = Math.min(1.5, (speedKmh - 70) / 160);
+      const velocityRumble = Math.pow(speedNorm, 1.45);
+      const nitroMultiplier = this.isNitroActive ? 1.55 : 1.0;
+      const speedAmp = velocityRumble * 0.085 * nitroMultiplier;
+
+      // High-frequency road vibration & engine harmonics
+      const roadJitter1 = Math.sin(this.shakeTime * 1.8) * 0.6 + Math.cos(this.shakeTime * 3.4) * 0.4;
+      const roadJitter2 = Math.cos(this.shakeTime * 2.4) * 0.7 + Math.sin(this.shakeTime * 5.1) * 0.3;
+      const randomFlickerX = (Math.random() - 0.5) * 0.35;
+      const randomFlickerY = (Math.random() - 0.5) * 0.35;
+
+      // Road surface physical bumps derived from highway distance
+      const asphaltBump = (Math.sin(this.playerZ * 0.55) * 0.5 + Math.cos(this.playerZ * 1.35) * 0.3) * 0.035 * velocityRumble;
+
+      speedShakeX = (roadJitter1 + randomFlickerX) * speedAmp;
+      speedShakeY = (roadJitter2 + randomFlickerY) * speedAmp * 1.25 + asphaltBump;
+      speedShakeZ = Math.sin(this.shakeTime * 2.8) * 0.045 * velocityRumble;
+      speedRollShake = (Math.sin(this.shakeTime * 1.2) * 0.0075 + (Math.random() - 0.5) * 0.004) * velocityRumble * nitroMultiplier;
+    }
+
+    // 2. Collision Trauma Shake (Guardrail hits, traffic sideswipes, crashes, sonic wakes)
+    let collisionShakeX = 0;
+    let collisionShakeY = 0;
+    let collisionShakeZ = 0;
+    let collisionRollShake = 0;
+    let collisionPitchShake = 0;
+
+    if (this.camShakeIntensity > 0.01) {
+      const trauma = Math.min(2.0, this.camShakeIntensity);
+      const traumaFactor = Math.pow(trauma, 1.35);
+
+      collisionShakeX = (Math.random() - 0.5) * 0.95 * traumaFactor;
+      collisionShakeY = (Math.random() - 0.5) * 0.85 * traumaFactor;
+      collisionShakeZ = (Math.random() - 0.5) * 0.65 * traumaFactor;
+      collisionRollShake = (Math.random() - 0.5) * 0.065 * traumaFactor;
+      collisionPitchShake = (Math.random() - 0.5) * 0.035 * traumaFactor;
+
+      // Decay trauma intensity (longer decay during slow-mo crash)
+      const decayRate = this.isCrashing ? 1.4 : 3.8;
+      this.camShakeIntensity = THREE.MathUtils.lerp(this.camShakeIntensity, 0, delta * decayRate);
+    }
+
+    // Combined instantaneous shake displacements
+    const totalShakeX = speedShakeX + collisionShakeX;
+    const totalShakeY = speedShakeY + collisionShakeY;
+    const totalShakeZ = speedShakeZ + collisionShakeZ;
+
+    // Direct application to camera position ensures high-frequency tactile response
+    this.camera.position.set(
+      this.currentCamPos.x + totalShakeX,
+      this.currentCamPos.y + totalShakeY,
+      this.currentCamPos.z + totalShakeZ
+    );
+
+    // Apply look target with subtle parallax dampening
+    this.camera.lookAt(
+      this.currentLookTarget.x + totalShakeX * 0.3,
+      this.currentLookTarget.y + totalShakeY * 0.3,
+      this.currentLookTarget.z
+    );
+
+    // Dynamic camera roll and pitch shock in camera-local space
+    if (Math.abs(speedRollShake + collisionRollShake) > 0.0001) {
+      this.camera.rotateZ(speedRollShake + collisionRollShake);
+    }
+    if (Math.abs(collisionPitchShake) > 0.0001) {
+      this.camera.rotateX(collisionPitchShake);
+    }
   }
 
   private updateAudioAndTelemetry() {
@@ -742,6 +878,8 @@ export class GameEngine {
 
     const multiplier = Math.max(1.0, Number((speedKmh / 80).toFixed(1)));
 
+    const trafficSignal = this.trafficLightManager.getTelemetry(this.playerZ);
+
     this.callbacks.onTelemetry({
       speedKmh,
       maxSpeedKmh: this.maxSpeedAchievedKmh,
@@ -756,7 +894,37 @@ export class GameEngine {
       isNitroActive: this.isNitroActive,
       isBraking: this.input.brake,
       isHornActive: this.input.horn,
+      weather: this.weatherManager.currentCondition,
+      map: this.activeMapId,
+      trafficSignal,
     });
+  }
+
+  public setMap(mapId: MapId) {
+    this.activeMapId = mapId;
+    const mapDef = getMapById(mapId);
+    this.environment.setMap(mapDef);
+    this.ambientLight.color.setHex(mapDef.ambientColor);
+    this.ambientLight.intensity = mapDef.ambientIntensity;
+    this.dirLight.color.setHex(mapDef.dirLightColor);
+    this.dirLight.intensity = mapDef.dirLightIntensity;
+    this.scene.background = new THREE.Color(mapDef.skyColor);
+    if (this.scene.fog instanceof THREE.FogExp2) {
+      this.scene.fog.color.setHex(mapDef.fogColor);
+      this.scene.fog.density = mapDef.fogDensity;
+    }
+  }
+
+  public getMap(): MapId {
+    return this.activeMapId;
+  }
+
+  public setWeather(condition: WeatherCondition, immediate: boolean = false) {
+    this.weatherManager.setWeather(condition, immediate);
+  }
+
+  public getWeather(): WeatherCondition {
+    return this.weatherManager.currentCondition;
   }
 
   public renderTurntable(carDef: CarDefinition, paintHex: string, upgrades: Upgrades, rotAngle: number) {
@@ -803,6 +971,8 @@ export class GameEngine {
     }
     sound.stopEngine();
     sound.stopHorn();
+    sound.stopRain();
+    this.trafficLightManager?.clear();
     this.renderer.dispose();
   }
 }

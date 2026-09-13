@@ -1,7 +1,21 @@
 import React from 'react';
 import { TelemetryData, NearMissEvent, InputState } from '../types';
-import { Volume2, VolumeX, Pause, Zap, Megaphone, ArrowLeft, ArrowRight } from 'lucide-react';
+import {
+  Volume2,
+  VolumeX,
+  Pause,
+  Zap,
+  Megaphone,
+  ArrowLeft,
+  ArrowRight,
+  Sun,
+  CloudRain,
+  CloudFog,
+  MapPin,
+  AlertTriangle,
+} from 'lucide-react';
 import { sound } from '../utils/audio';
+import { getMapById } from '../data/maps';
 
 interface HUDProps {
   telemetry: TelemetryData;
@@ -59,8 +73,8 @@ export const HUD: React.FC<HUDProps> = ({
           </div>
         </div>
 
-        {/* Center: Near Miss Notifications */}
-        <div className="absolute left-1/2 -translate-x-1/2 top-4 flex flex-col items-center gap-1.5">
+        {/* Center: Near Miss & Traffic Signal Alert Notifications */}
+        <div className="absolute left-1/2 -translate-x-1/2 top-4 flex flex-col items-center gap-1.5 w-full max-w-md px-4 pointer-events-none">
           {nearMisses.slice(-2).map((nm) => (
             <div
               key={nm.id}
@@ -73,10 +87,105 @@ export const HUD: React.FC<HUDProps> = ({
               </span>
             </div>
           ))}
+
+          {/* Approaching Highway Traffic Light Signal HUD */}
+          {telemetry.trafficSignal && telemetry.trafficSignal.distanceMeters > 0 && telemetry.trafficSignal.distanceMeters < 240 && (
+            <div
+              id="hud-traffic-signal-indicator"
+              className={`flex items-center justify-between gap-3 px-3.5 py-1.5 rounded-xl backdrop-blur-md border shadow-2xl transition-all duration-200 ${
+                telemetry.trafficSignal.state === 'red'
+                  ? 'bg-red-950/90 border-red-500 text-red-200 ring-2 ring-red-500/40 animate-pulse'
+                  : telemetry.trafficSignal.state === 'yellow'
+                  ? 'bg-amber-950/90 border-amber-500 text-amber-200 ring-1 ring-amber-500/40'
+                  : 'bg-emerald-950/80 border-emerald-500/60 text-emerald-200'
+              }`}
+            >
+              {/* Traffic Light Head Icon with 3 Lenses */}
+              <div className="flex items-center gap-1 bg-zinc-950 px-2 py-1 rounded-lg border border-zinc-700 shadow-inner">
+                <span
+                  className={`w-3 h-3 rounded-full transition-all duration-150 ${
+                    telemetry.trafficSignal.state === 'red'
+                      ? 'bg-red-500 shadow-[0_0_10px_#ef4444] scale-110'
+                      : 'bg-red-950/50'
+                  }`}
+                />
+                <span
+                  className={`w-3 h-3 rounded-full transition-all duration-150 ${
+                    telemetry.trafficSignal.state === 'yellow'
+                      ? 'bg-amber-400 shadow-[0_0_10px_#f59e0b] scale-110'
+                      : 'bg-amber-950/50'
+                  }`}
+                />
+                <span
+                  className={`w-3 h-3 rounded-full transition-all duration-150 ${
+                    telemetry.trafficSignal.state === 'green'
+                      ? 'bg-emerald-400 shadow-[0_0_10px_#10b981] scale-110'
+                      : 'bg-emerald-950/50'
+                  }`}
+                />
+              </div>
+
+              {/* Status Message */}
+              <div className="flex flex-col text-left">
+                <div className="flex items-center gap-1.5">
+                  {telemetry.trafficSignal.state === 'red' && (
+                    <AlertTriangle className="w-4 h-4 text-red-400 animate-bounce" />
+                  )}
+                  <span className="text-xs font-black uppercase tracking-wider">
+                    {telemetry.trafficSignal.state === 'red'
+                      ? 'RED LIGHT — WEAVE STOPPED TRAFFIC'
+                      : telemetry.trafficSignal.state === 'yellow'
+                      ? 'CAUTION — SIGNAL CHANGING'
+                      : 'SIGNAL GREEN — SPEED CLEAR'}
+                  </span>
+                </div>
+                <div className="text-[11px] font-semibold opacity-90">
+                  <span>{Math.round(telemetry.trafficSignal.distanceMeters ?? 0)}m ahead</span>
+                  <span className="mx-1">•</span>
+                  <span>{Math.max(0, Math.round(telemetry.trafficSignal.timeRemaining ?? 0))}s left</span>
+                </div>
+              </div>
+
+              {/* Distance Meter Ring / Badge */}
+              <div className="bg-zinc-950/80 px-2 py-1 rounded-md text-[11px] font-black text-white tabular-nums border border-zinc-700/60">
+                {Math.round(telemetry.trafficSignal.distanceMeters)}m
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Right: Coins Wallet & Audio/Pause Buttons */}
+        {/* Right: Map & Weather Condition, Coins Wallet & Audio/Pause Buttons */}
         <div className="flex items-center gap-2 pointer-events-auto">
+          {/* Active Map Badge */}
+          <div
+            id="hud-map-badge"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-900/80 backdrop-blur-md border border-zinc-700/60 shadow-lg text-xs font-bold text-zinc-200"
+          >
+            <MapPin className="w-3.5 h-3.5 text-red-400" />
+            <span className="truncate max-w-[120px]">{getMapById(telemetry.map).name}</span>
+          </div>
+
+          {/* Dynamic Weather Indicator */}
+          <div
+            id="hud-weather-badge"
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg backdrop-blur-md border shadow-lg text-xs font-bold transition-colors ${
+              telemetry.weather === 'rainy'
+                ? 'bg-blue-950/80 border-blue-500/50 text-blue-200'
+                : telemetry.weather === 'foggy'
+                ? 'bg-slate-900/80 border-slate-500/50 text-slate-200'
+                : 'bg-zinc-900/80 border-zinc-700/60 text-amber-300'
+            }`}
+          >
+            {telemetry.weather === 'rainy' ? (
+              <CloudRain className="w-4 h-4 text-blue-400 animate-pulse" />
+            ) : telemetry.weather === 'foggy' ? (
+              <CloudFog className="w-4 h-4 text-slate-300" />
+            ) : (
+              <Sun className="w-4 h-4 text-amber-400" />
+            )}
+            <span className="capitalize tracking-wider">{telemetry.weather}</span>
+          </div>
+
           <div className="flex items-center gap-1.5 bg-zinc-900/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-amber-500/40 shadow-lg text-amber-400 font-black">
             <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-amber-600 to-amber-300 flex items-center justify-center text-zinc-950 text-xs font-black shadow">
               $

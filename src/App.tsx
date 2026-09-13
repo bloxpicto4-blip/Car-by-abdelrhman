@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { GameState, InputState, NearMissEvent, PlayerSaveData, TelemetryData, Upgrades } from './types';
+import { GameState, InputState, NearMissEvent, PlayerSaveData, TelemetryData, Upgrades, MapId } from './types';
 import { loadGameData, saveGameData } from './utils/storage';
 import { CARS_CATALOG } from './data/cars';
 import { GameEngine } from './game/GameEngine';
@@ -32,6 +32,7 @@ export default function App() {
     isNitroActive: false,
     isBraking: false,
     isHornActive: false,
+    weather: 'clear',
   });
 
   const [nearMissEvents, setNearMissEvents] = useState<NearMissEvent[]>([]);
@@ -105,6 +106,7 @@ export default function App() {
       brakingLevel: 1,
     };
     engine.setCar(currentCar, currentPaint, currentUpgrades);
+    engine.setMap(playerData.currentMapId || 'metropolis');
 
     return () => {
       engine.destroy();
@@ -268,6 +270,16 @@ export default function App() {
     engineRef.current.renderTurntable(carDef, colorHex, upgrades, turntableAngleRef.current);
   }, []);
 
+  const handleSelectMap = useCallback((mapId: MapId) => {
+    setPlayerData((prev) => ({
+      ...prev,
+      currentMapId: mapId,
+    }));
+    if (engineRef.current) {
+      engineRef.current.setMap(mapId);
+    }
+  }, []);
+
   return (
     <div id="game-root" className="relative w-screen h-screen overflow-hidden bg-black select-none touch-none">
       {/* 3D WebGL Canvas Viewport */}
@@ -283,6 +295,7 @@ export default function App() {
           playerData={playerData}
           onStartRace={handleStartRace}
           onOpenGarage={handleGoToGarage}
+          onSelectMap={handleSelectMap}
           isMuted={isMuted}
           onToggleMute={handleToggleMute}
         />
@@ -296,6 +309,7 @@ export default function App() {
           onBackToMenu={handleGoToMenu}
           onStartRace={handleStartRace}
           onSelectCarForTurntable={handleTurntableSelect}
+          onSelectMap={handleSelectMap}
         />
       )}
 

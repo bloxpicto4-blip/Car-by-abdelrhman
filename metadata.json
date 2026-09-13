@@ -1,6 +1,6 @@
 {
   "name": "Traffic Racer 3D",
-  "description": "Playable 3D mobile-friendly arcade highway traffic racing game featuring smooth steering, high-speed dodging, traffic AI, upgrades, and garage progression.",
+  "description": "High-octane 3D highway racer featuring iconic supercars, dynamic multi-environment tracks, traffic AI, and interactive traffic light gantries requiring slalom weaves around stopped traffic during red light phases.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

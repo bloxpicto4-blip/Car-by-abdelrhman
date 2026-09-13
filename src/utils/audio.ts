@@ -12,6 +12,10 @@ class SoundSystem {
   private engineFilter: BiquadFilterNode | null = null;
   private isEngineRunning: boolean = false;
 
+  private rainNode: AudioBufferSourceNode | null = null;
+  private rainGain: GainNode | null = null;
+  private isRainPlaying: boolean = false;
+
   private hornOsc1: OscillatorNode | null = null;
   private hornOsc2: OscillatorNode | null = null;
   private hornGain: GainNode | null = null;
@@ -36,6 +40,67 @@ class SoundSystem {
     this.isMuted = muted;
     if (this.engineGain && this.ctx) {
       this.engineGain.gain.setValueAtTime(muted ? 0 : 0.12, this.ctx.currentTime);
+    }
+    if (this.rainGain && this.ctx) {
+      this.rainGain.gain.setValueAtTime(muted ? 0 : 0.05, this.ctx.currentTime);
+    }
+  }
+
+  public setRainIntensity(intensity: number) {
+    if (this.isMuted || intensity <= 0.02) {
+      if (this.rainGain && this.ctx) {
+        this.rainGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.2);
+      }
+      return;
+    }
+    this.initContext();
+    if (!this.ctx) return;
+
+    if (!this.isRainPlaying) {
+      try {
+        const bufferSize = Math.floor(this.ctx.sampleRate * 2.0);
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        let b0 = 0, b1 = 0, b2 = 0;
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          b0 = 0.99886 * b0 + white * 0.0555179;
+          b1 = 0.99332 * b1 + white * 0.0750759;
+          b2 = 0.96900 * b2 + white * 0.1538520;
+          data[i] = (b0 + b1 + b2) * 0.12;
+        }
+
+        this.rainNode = this.ctx.createBufferSource();
+        this.rainNode.buffer = buffer;
+        this.rainNode.loop = true;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(1400, this.ctx.currentTime);
+
+        this.rainGain = this.ctx.createGain();
+        this.rainGain.gain.setValueAtTime(0.001, this.ctx.currentTime);
+
+        this.rainNode.connect(filter);
+        filter.connect(this.rainGain);
+        this.rainGain.connect(this.ctx.destination);
+
+        this.rainNode.start();
+        this.isRainPlaying = true;
+      } catch (e) {
+        console.warn('Rain audio initialization error:', e);
+      }
+    }
+
+    if (this.rainGain && this.ctx) {
+      const targetGain = Math.min(0.06, intensity * 0.055);
+      this.rainGain.gain.setTargetAtTime(targetGain, this.ctx.currentTime, 0.3);
+    }
+  }
+
+  public stopRain() {
+    if (this.rainGain && this.ctx) {
+      this.rainGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.1);
     }
   }
 
@@ -370,6 +435,60 @@ class SoundSystem {
     gain.connect(this.ctx.destination);
     osc.start(t);
     osc.stop(t + 0.04);
+  }
+
+  public playTrafficSignalAlert(isRed: boolean) {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    if (isRed) {
+      // Urgent double warning pip for red light / stopped traffic ahead
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(620, t);
+      osc.frequency.setValueAtTime(440, t + 0.09);
+
+      gain.gain.setValueAtTime(0.12, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+    } else {
+      // Soft yellow caution chirp
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(540, t);
+      osc.frequency.setValueAtTime(680, t + 0.07);
+
+      gain.gain.setValueAtTime(0.09, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+    }
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.25);
+  }
+
+  public playIntersectionCleared() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx) return;
+
+    const t = this.ctx.currentTime;
+    const notes = [659.25, 830.61, 1046.5]; // E5, G#5, C6
+    notes.forEach((freq, idx) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, t + idx * 0.06);
+      gain.gain.setValueAtTime(0.14, t + idx * 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + idx * 0.06 + 0.2);
+      osc.connect(gain);
+      gain.connect(this.ctx!.destination);
+      osc.start(t + idx * 0.06);
+      osc.stop(t + idx * 0.06 + 0.2);
+    });
   }
 }
 
